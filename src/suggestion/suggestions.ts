@@ -42,7 +42,7 @@ function titlesPrompt(language: string): string {
   ].join(" ");
 }
 
-// Matches sanitizeWord's spirit (db.ts): letters/marks with inner apostrophes
+// Matches sanitizeWord's spirit (words.ts): letters/marks with inner apostrophes
 // or hyphens — single words only, so no spaces.
 const WORD_REGEX = /^[\p{L}\p{M}][\p{L}\p{M}'-]*$/u;
 
