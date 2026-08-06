@@ -1,0 +1,38 @@
+{
+  "name": "word-bank-server",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "license": "MIT",
+  "description": "Word Bank Server REST API",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "dev": "tsx watch --env-file-if-exists=.env src/index.ts",
+    "build": "tsc",
+    "start": "node --env-file-if-exists=.env dist/index.js",
+    "seed-test-words": "tsx --env-file-if-exists=.env scripts/seed-test-words.ts",
+    "delete-test-words": "tsx --env-file-if-exists=.env scripts/delete-test-words.ts",
+    "delete-word": "tsx --env-file-if-exists=.env scripts/delete-word.ts",
+    "test-rate-limit": "tsx scripts/test-rate-limit.ts",
+    "lint": "eslint ."
+  },
+  "dependencies": {
+    "chalk": "^6.0.0",
+    "cors": "^2.8.6",
+    "express": "^5.0.1",
+    "express-rate-limit": "^8.6.2",
+    "morgan": "^1.11.0"
+  },
+  "devDependencies": {
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.0",
+    "@types/morgan": "^1.9.10",
+    "@types/node": "^24.13.3",
+    "eslint": "^10.8.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.7.0",
+    "typescript-eslint": "^8.65.0"
+  }
+}
