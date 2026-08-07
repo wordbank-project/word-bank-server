@@ -4,6 +4,8 @@
 import chalk from "chalk";
 import { CompleteOptions } from "./complete-options.js";
 
+import { HttpError } from "../utils/http-error.js";
+
 const GROQ_API_KEY = process.env.GROQ_API_KEY?.trim() || undefined;
 const MODEL = process.env.SUGGESTIONS_MODEL || "llama-3.3-70b-versatile";
 
@@ -57,7 +59,7 @@ export async function completeChat(prompt: string, options: CompleteOptions = {}
             signal: controller.signal,
         });
         if (!res.ok) {
-            throw new Error(`HTTP ${res.status}`);
+            throw new HttpError(res.status, `Groq returned HTTP ${res.status}`);
         }
         const data = (await res.json()) as { choices?: { message?: { content?: unknown } }[] };
         const text = data?.choices?.[0]?.message?.content;

@@ -5,6 +5,8 @@ import { upsertWord, getWords, sanitizeWord, sanitizeText } from "./word/words.j
 import { getSuggestionPair } from "./suggestion/suggestions.js";
 import { analyzeSentence } from "./ai/analyze.js";
 
+import { sendErrorResponse } from "./utils/http-error.js";
+
 import { createRequestLogger, logListening } from "./middleware/request-logger.js";
 import { analyzeRateLimiter, wordsRateLimiter } from "./middleware/rate-limit.js";
 import { parseAllowedOrigins } from "./middleware/cors.js";
@@ -55,7 +57,8 @@ app.get("/v1", (_req: Request, res: Response) => {
  *
  * @param {Request} req The incoming request; body is `{ word, definition?, partOfSpeech?, phonetic? }`.
  * @param {Response} res The response used to send the result.
- * @returns {void} Returns nothing; sends `{ success: true }`, a `400`, a `429`, or a `500`.
+ * @returns {void} Returns nothing; sends `{ success: true }`, a `400`, a `429`, or a `500`
+ * (an unexpected error is caught below and sent via sendErrorResponse.
  * @example POST http://localhost:4000/v1/words
  *
  */
@@ -75,8 +78,8 @@ app.post("/v1/words", wordsRateLimiter, (req: Request, res: Response) => {
       phonetic: sanitizeText(req.body?.phonetic, 120),
     });
     res.status(200).json({ success: true });
-  } catch {
-    res.status(500).json({ success: false });
+  } catch (err: unknown) {
+    sendErrorResponse(err, res);
   }
 });
 
@@ -103,15 +106,17 @@ app.get("/v1/words", (req: Request, res: Response) => {
 
 /**
  * Returns AI-generated word/title suggestions for the app's typewriter
- * placeholders (see suggestions.ts). Without `GROQ_API_KEY` — or on any
- * failure — returns empty arrays so the app falls back to its built-in lists.
+ * placeholders (see suggestions.ts). Without `GROQ_API_KEY` returns empty
+ * arrays so the app falls back to its built-in lists. Any other failure (a
+ * Groq-side rate limit, an unexpected error) is caught below and sent via
+ * sendErrorResponse.
  * Default is English (`lang=en`), but any ISO 639 language code is accepted (e.g. `lang=nl`).
  *
  * @param {Request} req The incoming request; `lang` query param selects the language.
  * @param {Response} res The response used to send the suggestion pair.
- * @returns {Promise<void>} Returns nothing; sends the JSON suggestion pair or a `400` bad request.
+ * @returns {Promise<void>} Returns nothing; sends the JSON suggestion pair, a `400`, a `429`, or a `500`.
  * @example GET http://localhost:4000/v1/suggestions?lang=nl
- * 
+ *
  */
 app.get("/v1/suggestions", async (req: Request, res: Response) => {
   const chosenLanguage = typeof req.query.lang === "string" ? req.query.lang.toLowerCase() : "en";
@@ -122,21 +127,21 @@ app.get("/v1/suggestions", async (req: Request, res: Response) => {
 
   try {
     res.status(200).json(await getSuggestionPair(chosenLanguage));
-  } catch {
-    res.status(500).json({ words: [], titles: [] });
+  } catch (err: unknown) {
+    sendErrorResponse(err, res);
   }
 });
 
 /**
  * Explains what a submitted sentence means, in plain language (see analyze.ts).
- * Without `GROQ_API_KEY` — or on any failure — returns `{ meaning: null }`.
- *
- * Rate limited (see middleware/rate-limit.ts) — the limiter runs before this handler, 
+ * Without `GROQ_API_KEY` returns `{ meaning: null }`. Any other failure (a Groq-side rate
+ * limit, an unexpected error) is caught below and sent via sendErrorResponse.
+ * Rate limited (see middleware/rate-limit.ts) — the limiter runs before this handler,
  * so an over-limit request never even reaches the validation below.
  *
  * @param {Request} req The incoming request; `lang` query param selects the language, body is `{ text }`.
  * @param {Response} res The response used to send the result.
- * @returns {Promise<void>} Returns nothing; sends the JSON explanation, a `400`, or a `429`.
+ * @returns {Promise<void>} Returns nothing; sends the JSON explanation, a `400`, a `429`, or a `500`.
  * @example POST http://localhost:4000/v1/analyze?lang=nl
  *
  */
@@ -155,8 +160,8 @@ app.post("/v1/analyze", analyzeRateLimiter, async (req: Request, res: Response) 
 
   try {
     res.json({ meaning: await analyzeSentence(enteredSentence, chosenLanguage) });
-  } catch {
-    res.status(500).json({ meaning: null });
+  } catch (err: unknown) {
+    sendErrorResponse(err, res);
   }
 });
 
