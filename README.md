@@ -2,8 +2,8 @@
 
 A tiny Express + TypeScript + Node's built-in [`node:sqlite`](https://nodejs.org/api/sqlite.html)
 service that collects individual words added by users in the Word Bank app and serves an
-aggregated list back to the marketing site's floating-words background animation. It also
-hosts two Groq-backed AI endpoints: `/v1/suggestions` (typewriter placeholder words/titles)
+aggregated list back to the marketing site's floating-words background animation and the words that the users have currently saved with the app. 
+It also hosts two Groq-backed AI endpoints: `/v1/suggestions` (typewriter placeholder words/titles and example sentences)
 and `/v1/analyze` (plain-language sentence explanation).
 
 It stores nothing but the bare word, a frequency count, and optional public dictionary
@@ -23,7 +23,7 @@ metadata (definition, part of speech, phonetic) — no user id, no book id, no p
   ([`express-rate-limit`](https://www.npmjs.com/package/express-rate-limit)), keyed off
   Cloudflare's tamper-proof `Cf-Connecting-Ip` header when present so a spoofed
   `X-Forwarded-For` can't buy a fresh budget.
-- **No accounts, no PII** — words are stored anonymously; there's deliberately no DELETE
+- **No accounts, no Personal identifiable information** — words are stored anonymously; there's deliberately no DELETE
   endpoint (see [Deleting a word](#deleting-a-word) below).
 
 ## Tech stack
@@ -44,7 +44,7 @@ npm run dev            # tsx watch, hot reload, auto-loads .env
 ```
 
 The server listens on `http://localhost:4000` by default; try `curl http://localhost:4000/v1`
-for a health check.
+or visit it for a health check.
 
 ## Environment variables
 
