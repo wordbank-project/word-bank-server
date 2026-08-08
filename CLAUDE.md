@@ -88,9 +88,12 @@ something used maybe once in a while:
 - **Every `if`/`for`/`while` body is braced**, even single-statement ones — no one-liners
   like `if (x) return null;`. This is enforced by ESLint's `curly: ["error", "all"]` rule
   in [`eslint.config.js`](eslint.config.js); run `npm run lint` before committing.
-- **JSDoc on every exported function** — a prose summary plus a described `@param`/
-  `@returns` for each, even when the type is already declared natively and the tag is
-  technically redundant. Match the existing comments in `words.ts`/`suggestions.ts`/`llm.ts`.
+- **JSDoc on every exported function, and every function with parameters even if it
+  isn't exported** — a prose summary plus a described `@param`/`@returns` for each, even
+  when the type is already declared natively and the tag is technically redundant. This
+  also covers `index.ts`'s route handlers: they're inline callbacks, not exports, but they
+  take `req`/`res` params, so they get the same treatment — match the existing comments
+  there. Match the existing comments in `words.ts`/`suggestions.ts`/`llm.ts` too.
   End every JSDoc block with a blank `* ` line right after the last `@returns` line, before
   the closing `*/` — e.g.:
   ```ts
