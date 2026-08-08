@@ -13,8 +13,8 @@ metadata (definition, part of speech, phonetic) — no user id, no book id, no p
 
 - **Word collection** — `POST /v1/words` saves a word (incrementing its count if already
   seen); `GET /v1/words` serves the aggregated list back, sorted by recency or popularity.
-- **AI suggestions** — `GET /v1/suggestions` generates vocabulary words and book titles for
-  the app's typewriter placeholder, via Groq's free-tier LLM.
+- **AI suggestions** — `GET /v1/suggestions` generates vocabulary words, book titles and example sentences for
+  the app's typewriter placeholders and the analyze page, via Groq's free-tier LLM.
 - **AI sentence analysis** — `POST /v1/analyze` explains a submitted sentence in plain
   language, also via Groq.
 - **No caching, no database for AI features** — every AI request calls the model live, a

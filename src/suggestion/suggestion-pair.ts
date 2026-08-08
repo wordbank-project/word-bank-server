@@ -5,4 +5,6 @@ export type SuggestionPair = {
     words: string[];
     /** Well-known book titles for the typewriter placeholder. */
     titles: string[];
+    /** Well-known sentences for analyze sentence examples. */
+    sentences: string[];
 };
