@@ -30,7 +30,7 @@ function wordsPrompt(language: string): string {
  *
  * @param {string} language The ISO 639 language code to generate titles for.
  * @returns {string} The full prompt text.
- * 
+ *
  */
 function titlesPrompt(language: string): string {
   return [
@@ -92,7 +92,7 @@ function extractJsonArray(text: string): unknown {
  * @param {string} text The model's raw text reply.
  * @param {SuggestionKind} kind Which list this is — controls the length cap and, for `"words"`, the word-shape check.
  * @returns {string[]} The cleaned, deduplicated suggestion strings.
- * 
+ *
  */
 export function parseSuggestionList(text: string, kind: SuggestionKind): string[] {
   const parsed = extractJsonArray(text);
@@ -100,7 +100,8 @@ export function parseSuggestionList(text: string, kind: SuggestionKind): string[
     return [];
   }
 
-  const maxLength = kind === "words" ? 60 : 120; // words are single words, titles and sentences can be longer
+  // words are single words; sentences run longer.
+  const maxLength = kind === "words" ? 60 : 120;
   const seen = new Set<string>();
   const items: string[] = [];
   for (const raw of parsed) {
