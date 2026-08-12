@@ -105,7 +105,7 @@ app.get("/v1/words", (req: Request, res: Response) => {
 });
 
 /**
- * Returns AI-generated word/title/sentence suggestions for the app's typewriter
+ * Returns AI-generated word/book/sentence suggestions for the app's typewriter
  * placeholders (see suggestions.ts). Without `GROQ_API_KEY` returns empty
  * arrays so the app falls back to its built-in lists. Any other failure (a
  * Groq-side rate limit, an unexpected error) is caught below and sent via

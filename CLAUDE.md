@@ -5,7 +5,7 @@
 A tiny Express + TypeScript + Node's built-in `node:sqlite` service that collects individual words added
 by users in the Word Bank app and serves an aggregated list back to the marketing site's
 floating-words background animation. It also hosts two Groq-backed endpoints:
-`/v1/suggestions` (typewriter placeholder words/titles, plus example sentences for the app's
+`/v1/suggestions` (typewriter placeholder words/books, plus example sentences for the app's
 Analyze screen) and `/v1/analyze` (plain-language sentence explanation). It stores nothing but
 the bare word, a frequency count, and optional
 public dictionary metadata (definition, part of speech, phonetic) — no user id, no book id,
@@ -18,7 +18,7 @@ no private notes.
 | [`src/word/words.ts`](src/word/words.ts) | SQLite schema/migration, `sanitizeWord`/`sanitizeText` validators, `upsertWord`/`getWords`. `deleteWords` also lives here but is never exposed over HTTP — see "Deleting a word" below. |
 | [`src/ai/llm.ts`](src/ai/llm.ts) | The one function (`completeChat`) that calls Groq's OpenAI-compatible chat-completions endpoint. `hasLlmKeyConfigured()` gates every AI code path. |
 | [`src/ai/complete-options.ts`](src/ai/complete-options.ts) | `CompleteOptions` — the `json`/`maxTokens`/`timeoutMs` overrides `completeChat` accepts. |
-| [`src/suggestion/suggestions.ts`](src/suggestion/suggestions.ts) | Builds the `/v1/suggestions` response: one prompt per list (`wordsPrompt`/`titlesPrompt`/`sentencesPrompt`, fired together via `Promise.all` in `getSuggestionPair`), tolerant JSON-array extraction (`extractJsonArray`), and `parseSuggestionList` validation per `SuggestionKind`. |
+| [`src/suggestion/suggestions.ts`](src/suggestion/suggestions.ts) | Builds the `/v1/suggestions` response: one prompt per list (`wordsPrompt`/`booksPrompt`/`sentencesPrompt`, fired together via `Promise.all` in `getSuggestionPair`), tolerant JSON-array extraction (`extractJsonArray`), `parseSuggestionList` validation for words/sentences (per `SuggestionKind`), and `parseBookList` for the structured `{ title, author, year }` book list. |
 | [`src/ai/analyze.ts`](src/ai/analyze.ts) | Builds the `/v1/analyze` response: one prompt, one live call to `completeChat`, no parsing needed since the reply is plain text. |
 | [`src/middleware/rate-limit.ts`](src/middleware/rate-limit.ts) | Builds `analyzeRateLimiter`/`wordsRateLimiter`, one `express-rate-limit` instance per limited route. Each keys requests off Cloudflare's tamper-proof `Cf-Connecting-Ip` header when present, falling back to `req.ip` otherwise — see "Rate limiting" below for why. In-memory only — resets on restart. |
 | [`src/middleware/cors.ts`](src/middleware/cors.ts) | `parseAllowedOrigins` — turns the `ALLOWED_ORIGIN` env var into what the `cors` middleware expects. |
@@ -35,7 +35,7 @@ no private notes.
 | GET | `/v1` | — | `{ success: true, title: "Word Bank Server REST API" }` health check |
 | POST | `/v1/words` | `{ word, definition?, partOfSpeech?, phonetic? }` | `200 { success: true }` / `400 { success: false, error }` / `429 { success: false, error }` / `500 { success: false }` |
 | GET | `/v1/words` | `limit` (default 100, clamped 1..500), `order` (`top` \| `recent`, default `recent`) | `200 [{ word, count, definition, partOfSpeech, phonetic }]` |
-| GET | `/v1/suggestions` | `lang` (default `en`, must match `^[a-z]{2,3}$`) | `200 { words: string[], titles: string[], sentences: string[] }` (empty arrays when `GROQ_API_KEY` is unset or on any failure) |
+| GET | `/v1/suggestions` | `lang` (default `en`, must match `^[a-z]{2,3}$`) | `200 { words: string[], books: { title: string, author: string, year: string }[], sentences: string[] }` (empty arrays when `GROQ_API_KEY` is unset or on any failure) |
 | POST | `/v1/analyze` | `lang` query param (default `en`, same regex), body `{ text }` (`<= 300` chars via `sanitizeText`) | `200 { meaning: string \| null }` / `400 { success: false, error }` / `429 { success: false, error }` |
 
 There is deliberately **no DELETE endpoint** — see "Deleting a word" below.

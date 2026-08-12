@@ -3,7 +3,7 @@
 A tiny Express + TypeScript + Node's built-in [`node:sqlite`](https://nodejs.org/api/sqlite.html)
 service that collects individual words added by users in the Word Bank app and serves an
 aggregated list back to the marketing site's floating-words background animation and the words that the users have currently saved with the app. 
-It also hosts two Groq-backed AI endpoints: `/v1/suggestions` (typewriter placeholder words/titles and example sentences)
+It also hosts two Groq-backed AI endpoints: `/v1/suggestions` (typewriter placeholder words/books and example sentences)
 and `/v1/analyze` (plain-language sentence explanation).
 
 It stores nothing but the bare word, a frequency count, and optional public dictionary
@@ -13,8 +13,8 @@ metadata (definition, part of speech, phonetic) — no user id, no book id, no p
 
 - **Word collection** — `POST /v1/words` saves a word (incrementing its count if already
   seen); `GET /v1/words` serves the aggregated list back, sorted by recency or popularity.
-- **AI suggestions** — `GET /v1/suggestions` generates vocabulary words, book titles and example sentences for
-  the app's typewriter placeholders and the analyze page, via Groq's free-tier LLM.
+- **AI suggestions** — `GET /v1/suggestions` generates vocabulary words, books (title/author/year)
+  and example sentences for the app's typewriter placeholders and the analyze page, via Groq's free-tier LLM.
 - **AI sentence analysis** — `POST /v1/analyze` explains a submitted sentence in plain
   language, also via Groq.
 - **No caching, no database for AI features** — every AI request calls the model live, a
@@ -68,7 +68,7 @@ or visit it for a health check.
 | GET | `/v1` | — | `{ success: true, title: "Word Bank Server REST API" }` health check |
 | POST | `/v1/words` | `{ word, definition?, partOfSpeech?, phonetic? }` | `200 { success: true }` / `400 { success: false, error }` / `429 { success: false, error }` / `500 { success: false }` |
 | GET | `/v1/words` | `limit` (default 100, clamped 1..500), `order` (`top` \| `recent`, default `recent`) | `200 [{ word, count, definition, partOfSpeech, phonetic }]` |
-| GET | `/v1/suggestions` | `lang` (default `en`, must match `^[a-z]{2,3}$`) | `200 { words: string[], titles: string[] }` (empty arrays when `GROQ_API_KEY` is unset or on any failure) |
+| GET | `/v1/suggestions` | `lang` (default `en`, must match `^[a-z]{2,3}$`) | `200 { words: string[], books: { title: string, author: string, year: string }[], sentences: string[] }` (empty arrays when `GROQ_API_KEY` is unset or on any failure) |
 | POST | `/v1/analyze` | `lang` query param (default `en`, same regex), body `{ text }` (`<= 300` chars) | `200 { meaning: string \| null }` / `400 { success: false, error }` / `429 { success: false, error }` |
 
 A submitted word is only accepted if it's a non-empty string `<= 60` characters, doesn't look
