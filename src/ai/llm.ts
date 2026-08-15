@@ -7,7 +7,7 @@ import { CompleteOptions } from "./complete-options.js";
 import { HttpError } from "../utils/http-error.js";
 
 const GROQ_API_KEY = process.env.GROQ_API_KEY?.trim() || undefined;
-const MODEL = process.env.SUGGESTIONS_MODEL || "llama-3.3-70b-versatile";
+const MODEL = process.env.SUGGESTIONS_MODEL || "openai/gpt-oss-120b";
 
 const DEFAULT_TIMEOUT_MS = 60_000;
 const DEFAULT_MAX_TOKENS = 4000;

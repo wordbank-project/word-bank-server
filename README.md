@@ -54,7 +54,7 @@ or visit it for a health check.
 | `ALLOWED_ORIGIN` | `*` | CORS allowed origin(s) — comma-separated for multiple (e.g. site + app dev server). |
 | `DB_PATH` | `./data/words.db` | SQLite file location (parent dir auto-created). |
 | `GROQ_API_KEY` | *(unset)* | Enables `/v1/suggestions` and `/v1/analyze`. Free at [console.groq.com](https://console.groq.com). Without it, both endpoints stay up but return empty results. |
-| `SUGGESTIONS_MODEL` | `llama-3.3-70b-versatile` | Groq model used by both AI endpoints. |
+| `SUGGESTIONS_MODEL` | `openai/gpt-oss-120b` | Groq model used by both AI endpoints. |
 | `ANALYZE_PER_MINUTE` | `10` | Per-IP `/v1/analyze` requests per minute before `429`. |
 | `WORDS_PER_MINUTE` | `30` | Per-IP `/v1/words` requests per minute before `429`. |
 
