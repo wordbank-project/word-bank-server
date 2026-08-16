@@ -6,3 +6,4 @@ data/
 .env
 .claude/settings.local.json
 deployment.md
+llm.md
