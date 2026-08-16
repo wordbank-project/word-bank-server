@@ -22,7 +22,7 @@ if (GROQ_API_KEY) {
  * True when an API key is configured, i.e. the AI features are enabled.
  *
  * @returns {boolean} `true` if `GROQ_API_KEY` is set.
- * 
+ *
  */
 export function hasLlmKeyConfigured(): boolean {
     return Boolean(GROQ_API_KEY);
