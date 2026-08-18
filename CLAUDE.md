@@ -59,8 +59,10 @@ exactly one hop instead of trusting an unlimited chain.
 
 `/v1/analyze` needs rate limiting because it costs Groq quota per call and has no auth;
 `/v1/words` because it's the one endpoint anyone can script spam onto the public word wall.
-No caching: every AI request calls the model live, a deliberate simplicity tradeoff (see the
-top-of-file comments in `suggestions.ts`/`analyze.ts`).
+`llm.ts`'s `completeChat` retries once via Cerebras
+(`CEREBRAS_API_KEY`) whenever Groq specifically returns a `429` — a second, independent
+free-tier quota for exactly the requests the cache didn't prevent. Optional: unset, both
+endpoints behave exactly as if this didn't exist.
 
 `sanitizeWord` (`src/word/words.ts`) accepts a word only if: it's a string; non-empty and `<= 60`
 chars after `trim().toLowerCase()`; doesn't look like a URL/email (`://`, `http`, `@`); and
@@ -114,7 +116,9 @@ something used maybe once in a while:
 | `ALLOWED_ORIGIN` | `*` | CORS allowed origin(s) — comma-separated for multiple (e.g. site + app dev server). |
 | `DB_PATH` | `./data/words.db` | SQLite file location (parent dir auto-created). |
 | `GROQ_API_KEY` | *(unset)* | Enables `/v1/suggestions` and `/v1/analyze`. Free at [console.groq.com](https://console.groq.com). |
-| `SUGGESTIONS_MODEL` | `llama-3.3-70b-versatile` | Groq model used by both AI endpoints. |
+| `SUGGESTIONS_MODEL` | `openai/gpt-oss-120b` | Groq model used by both AI endpoints. |
+| `CEREBRAS_API_KEY` | *(unset)* | Optional fallback: retries once via Cerebras when Groq returns a `429`. Free at [cloud.cerebras.ai](https://cloud.cerebras.ai). Leave unset to keep today's behavior (a Groq `429` surfaces as-is). |
+| `CEREBRAS_MODEL` | `gpt-oss-120b` | Cerebras model used for the fallback retry. Cerebras's free-tier catalog shifts over time — verify this is still available before relying on it. |
 | `ANALYZE_PER_MINUTE` | `10` | Per-IP `/v1/analyze` requests per minute before `429`. |
 | `WORDS_PER_MINUTE` | `30` | Per-IP `/v1/words` requests per minute before `429`. |
 
