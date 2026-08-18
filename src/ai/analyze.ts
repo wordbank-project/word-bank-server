@@ -12,7 +12,7 @@ import { completeChat, hasLlmKeyConfigured } from "./llm.js";
  * @param {string} sentence The sentence to explain.
  * @param {string} language The ISO 639 language code to respond in.
  * @returns {string} The full prompt text.
- * 
+ *
  */
 function analysisPrompt(sentence: string, language: string): string {
   return [
