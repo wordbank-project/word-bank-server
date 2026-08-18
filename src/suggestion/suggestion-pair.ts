@@ -1,8 +1,11 @@
 /** The three AI-generated suggestion lists returned by `/suggestions`. */
 
 export type SuggestedBook = {
+    /* Title of the book */
     title: string;
+    /* Author of the book */
     author: string;
+    /* First published release year */
     year: string;
 };
 
