@@ -17,8 +17,9 @@ metadata (definition, part of speech, phonetic) — no user id, no book id, no p
   and example sentences for the app's typewriter placeholders and the analyze page, via Groq's free-tier LLM (Cerebras as fallback).
 - **AI sentence analysis** — `POST /v1/analyze` explains a submitted sentence in plain
   language, also via Groq.
-- **No caching, no database for AI features** — every AI request calls the model live, a
-  deliberate simplicity tradeoff.
+- **In-memory caching for AI features** — `/v1/suggestions` caches per language (TTL-based);
+  `/v1/analyze` caches per `(language, sentence)` pair (no TTL, capped entry count instead) —
+  both exist to reduce Groq's free-tier quota usage. In-memory only, resets on restart.
 - **Rate limited** — `/v1/words` and `/v1/analyze` are each rate limited per IP
   ([`express-rate-limit`](https://www.npmjs.com/package/express-rate-limit)), keyed off
   Cloudflare's tamper-proof `Cf-Connecting-Ip` header when present so a spoofed
@@ -32,6 +33,7 @@ metadata (definition, part of speech, phonetic) — no user id, no book id, no p
 - [Express](https://expressjs.com/) 5 + TypeScript
 - [Groq](https://console.groq.com) (OpenAI-compatible chat-completions API) for the AI endpoints
 - [Cerebras](https://cloud.cerebras.ai) (OpenAI-compatible chat-completions API) as a fallback when Groq returns a 429 rate limit
+- [lru-cache](https://www.npmjs.com/package/lru-cache) for the in-memory AI response caches
 - [express-rate-limit](https://www.npmjs.com/package/express-rate-limit), [cors](https://www.npmjs.com/package/cors), [morgan](https://www.npmjs.com/package/morgan) + [chalk](https://www.npmjs.com/package/chalk) for request logging
 
 ## Getting started

@@ -59,6 +59,15 @@ exactly one hop instead of trusting an unlimited chain.
 
 `/v1/analyze` needs rate limiting because it costs Groq quota per call and has no auth;
 `/v1/words` because it's the one endpoint anyone can script spam onto the public word wall.
+Both AI endpoints cache in memory. `/v1/suggestions` caches per language
+(`SUGGESTIONS_CACHE_TTL_MS`, see `suggestions.ts`) — added because Groq's free tier is gated
+mainly by tokens-per-minute, and one `/v1/suggestions` request fires three parallel completions
+at once. `/v1/analyze` caches per `(language, sentence)` pair, capped at
+`ANALYZE_CACHE_MAX_ENTRIES` entries with the oldest evicted first, **no TTL** — unlike
+suggestions, a sentence's explanation doesn't go stale, and repeats are more likely than
+"arbitrary user text" suggests: the app's suggested-sentence picker feeds from
+`/v1/suggestions`' cached `sentences` list, so many users can pick the same sentence within
+that cache's window (see `analyze.ts`). On top of both caches, 
 `llm.ts`'s `completeChat` retries once via Cerebras
 (`CEREBRAS_API_KEY`) whenever Groq specifically returns a `429` — a second, independent
 free-tier quota for exactly the requests the cache didn't prevent. Optional: unset, both
@@ -121,6 +130,8 @@ something used maybe once in a while:
 | `CEREBRAS_MODEL` | `gpt-oss-120b` | Cerebras model used for the fallback retry. Cerebras's free-tier catalog shifts over time — verify this is still available before relying on it. |
 | `ANALYZE_PER_MINUTE` | `10` | Per-IP `/v1/analyze` requests per minute before `429`. |
 | `WORDS_PER_MINUTE` | `30` | Per-IP `/v1/words` requests per minute before `429`. |
+| `SUGGESTIONS_CACHE_TTL_MS` | `900000` (15 min) | How long a `/v1/suggestions` result is cached in memory per language before the next request calls Groq live again. |
+| `ANALYZE_CACHE_MAX_ENTRIES` | `500` | Max `(language, sentence)` pairs `/v1/analyze` keeps cached at once — no TTL, so this entry count (oldest evicted first) is what bounds memory instead. |
 
 ## Run / build
 
