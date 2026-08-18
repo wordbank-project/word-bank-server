@@ -14,7 +14,7 @@ metadata (definition, part of speech, phonetic) — no user id, no book id, no p
 - **Word collection** — `POST /v1/words` saves a word (incrementing its count if already
   seen); `GET /v1/words` serves the aggregated list back, sorted by recency or popularity.
 - **AI suggestions** — `GET /v1/suggestions` generates vocabulary words, books (title/author/year)
-  and example sentences for the app's typewriter placeholders and the analyze page, via Groq's free-tier LLM.
+  and example sentences for the app's typewriter placeholders and the analyze page, via Groq's free-tier LLM (Cerebras as fallback).
 - **AI sentence analysis** — `POST /v1/analyze` explains a submitted sentence in plain
   language, also via Groq.
 - **No caching, no database for AI features** — every AI request calls the model live, a
@@ -31,6 +31,7 @@ metadata (definition, part of speech, phonetic) — no user id, no book id, no p
 - [Node.js](https://nodejs.org/) 24+ with the built-in [`node:sqlite`](https://nodejs.org/api/sqlite.html) module (no native compile step)
 - [Express](https://expressjs.com/) 5 + TypeScript
 - [Groq](https://console.groq.com) (OpenAI-compatible chat-completions API) for the AI endpoints
+- [Cerebras](https://cloud.cerebras.ai) (OpenAI-compatible chat-completions API) as a fallback when Groq returns a 429 rate limit
 - [express-rate-limit](https://www.npmjs.com/package/express-rate-limit), [cors](https://www.npmjs.com/package/cors), [morgan](https://www.npmjs.com/package/morgan) + [chalk](https://www.npmjs.com/package/chalk) for request logging
 
 ## Getting started
