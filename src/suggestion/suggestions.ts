@@ -216,6 +216,18 @@ const SUGGESTIONS_CACHE_TTL_MS = Number(process.env.SUGGESTIONS_CACHE_TTL_MS) ||
 const cache = new LRUCache<string, SuggestionPair>({ ttl: SUGGESTIONS_CACHE_TTL_MS, max: 100 });
 
 /**
+ * Checks whether a suggestion pair for this language is already cached, without triggering
+ * a live call if it isn't. Used by index.ts to set the `X-Cache` response header.
+ *
+ * @param {string} language The ISO 639 language code to check.
+ * @returns {boolean} `true` if a cached (and unexpired) result exists for this language.
+ *
+ */
+export function isSuggestionPairCached(language: string): boolean {
+  return cache.has(language);
+}
+
+/**
  * Fetches suggestion lists (words, books and sentences) for a language, serving a cached
  * result when one exists and hasn't expired, otherwise calling the model live for each.
  *

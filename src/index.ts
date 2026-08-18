@@ -2,8 +2,8 @@ import express, { type Request, type Response } from "express";
 import cors from "cors";
 
 import { upsertWord, getWords, sanitizeWord, sanitizeText } from "./word/words.js";
-import { getSuggestionPair } from "./suggestion/suggestions.js";
-import { analyzeSentence } from "./ai/analyze.js";
+import { getSuggestionPair, isSuggestionPairCached } from "./suggestion/suggestions.js";
+import { analyzeSentence, isAnalysisCached } from "./ai/analyze.js";
 
 import { sendErrorResponse } from "./utils/http-error.js";
 
@@ -111,6 +111,8 @@ app.get("/v1/words", (req: Request, res: Response) => {
  * Groq-side rate limit, an unexpected error) is caught below and sent via
  * sendErrorResponse.
  * Default is English (`lang=en`), but any ISO 639 language code is accepted (e.g. `lang=nl`).
+ * Sends an `X-Cache: HIT`/`MISS` response header so a browser can tell, without timing the
+ * request, whether this language was already cached (see suggestions.ts).
  *
  * @param {Request} req The incoming request; `lang` query param selects the language.
  * @param {Response} res The response used to send the suggestion pair.
@@ -126,6 +128,7 @@ app.get("/v1/suggestions", async (req: Request, res: Response) => {
   }
 
   try {
+    res.setHeader("X-Cache", isSuggestionPairCached(chosenLanguage) ? "HIT" : "MISS");
     res.status(200).json(await getSuggestionPair(chosenLanguage));
   } catch (err: unknown) {
     sendErrorResponse(err, res);
@@ -138,6 +141,8 @@ app.get("/v1/suggestions", async (req: Request, res: Response) => {
  * limit, an unexpected error) is caught below and sent via sendErrorResponse.
  * Rate limited (see middleware/rate-limit.ts) — the limiter runs before this handler,
  * so an over-limit request never even reaches the validation below.
+ * Sends an `X-Cache: HIT`/`MISS` response header so a browser can tell, without timing the
+ * request, whether this exact (language, sentence) pair was already cached (see analyze.ts).
  *
  * @param {Request} req The incoming request; `lang` query param selects the language, body is `{ text }`.
  * @param {Response} res The response used to send the result.
@@ -159,6 +164,7 @@ app.post("/v1/analyze", analyzeRateLimiter, async (req: Request, res: Response) 
   }
 
   try {
+    res.setHeader("X-Cache", isAnalysisCached(enteredSentence, chosenLanguage) ? "HIT" : "MISS");
     res.json({ meaning: await analyzeSentence(enteredSentence, chosenLanguage) });
   } catch (err: unknown) {
     sendErrorResponse(err, res);

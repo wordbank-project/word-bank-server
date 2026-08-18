@@ -73,6 +73,16 @@ that cache's window (see `analyze.ts`). On top of both caches,
 free-tier quota for exactly the requests the cache didn't prevent. Optional: unset, both
 endpoints behave exactly as if this didn't exist.
 
+Both routes also send an `X-Cache: HIT`/`MISS` response header, via `isSuggestionPairCached`
+(`suggestions.ts`) and `isAnalysisCached` (`analyze.ts`) — each just peeks the relevant cache
+(`.has(...)`) without consuming or mutating it, so a browser can confirm cache behavior
+directly in DevTools instead of having to compare request timings by hand. Worth knowing:
+since neither cache is scoped per caller, an `X-Cache: HIT` on `/v1/analyze` tells any client
+that *someone* already submitted that exact `(language, sentence)` pair before — a minor,
+low-severity cross-caller signal (no identity or count attached, and it requires guessing the
+exact sentence text) that already existed implicitly via response timing; the header just
+makes it exact instead of noisy.
+
 `sanitizeWord` (`src/word/words.ts`) accepts a word only if: it's a string; non-empty and `<= 60`
 chars after `trim().toLowerCase()`; doesn't look like a URL/email (`://`, `http`, `@`); and
 matches `^[\p{L}\p{M}][\p{L}\p{M} '-]*$` (Unicode letter/mark start, then letters, marks,

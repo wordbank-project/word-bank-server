@@ -29,6 +29,20 @@ function createLanguageSentenceCacheKey(language: string, sentence: string): str
 }
 
 /**
+ * Checks whether an explanation for this (language, sentence) pair is already cached,
+ * without triggering a live call if it isn't. Used by index.ts to set the `X-Cache`
+ * response header.
+ *
+ * @param {string} sentence The sentence being explained.
+ * @param {string} language The ISO 639 language code the explanation is in.
+ * @returns {boolean} `true` if a cached explanation exists for this exact pair.
+ *
+ */
+export function isAnalysisCached(sentence: string, language: string): boolean {
+  return cache.has(createLanguageSentenceCacheKey(language, sentence));
+}
+
+/**
  * Builds the prompt asking the model to explain a sentence in plain language.
  *
  * @param {string} sentence The sentence to explain.
