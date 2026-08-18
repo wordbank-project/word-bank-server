@@ -133,7 +133,7 @@ export async function completeChat(prompt: string, options: CompleteOptions = {}
                 timeoutMs,
             );
         }
-        // Any other erros
+        // Any other errors
         throw err;
     }
 }
