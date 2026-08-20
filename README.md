@@ -2,7 +2,7 @@
 
 A tiny Express + TypeScript + Node's built-in [`node:sqlite`](https://nodejs.org/api/sqlite.html)
 service that collects individual words added by users in the Word Bank app and serves an
-aggregated list back to the marketing site's floating-words background animation and the words that the users have currently saved with the app. 
+aggregated list back to the marketing site's floating-words background animation and word wall.
 It also hosts two Groq-backed (Cerebras fallback) AI endpoints: `/v1/suggestions` (typewriter placeholder words/books and example sentences)
 and `/v1/analyze` (plain-language sentence explanation).
 
@@ -17,14 +17,15 @@ metadata (definition, part of speech, phonetic) — no user id, no book id, no p
   and example sentences for the app's typewriter placeholders and the analyze page, via Groq's free-tier LLM (Cerebras as fallback).
 - **AI sentence analysis** — `POST /v1/analyze` explains a submitted sentence in plain
   language, also via Groq.
-- **In-memory caching for AI features** — `/v1/suggestions` caches per language (TTL-based);
-  `/v1/analyze` caches per `(language, sentence)` pair (no TTL, capped entry count instead) —
-  both exist to reduce Groq's free-tier quota usage. In-memory only, resets on restart.
+- **In-memory caching for AI features**, via [`lru-cache`](https://www.npmjs.com/package/lru-cache)
+  — `/v1/suggestions` caches per language (TTL-based); `/v1/analyze` caches per
+  `(language, sentence)` pair (no TTL, capped entry count instead). Both exist to reduce
+  Groq's free-tier quota usage. In-memory only, resets on restart.
 - **Rate limited** — `/v1/words` and `/v1/analyze` are each rate limited per IP
   ([`express-rate-limit`](https://www.npmjs.com/package/express-rate-limit)), keyed off
   Cloudflare's tamper-proof `Cf-Connecting-Ip` header when present so a spoofed
   `X-Forwarded-For` can't buy a fresh budget.
-- **No accounts, no Personal identifiable information** — words are stored anonymously; there's deliberately no DELETE
+- **No accounts, no personally identifiable information** — words are stored anonymously; there's deliberately no DELETE
   endpoint (see [Deleting a word](#deleting-a-word) below).
 
 ## Tech stack
@@ -58,8 +59,12 @@ or visit it for a health check.
 | `DB_PATH` | `./data/words.db` | SQLite file location (parent dir auto-created). |
 | `GROQ_API_KEY` | *(unset)* | Enables `/v1/suggestions` and `/v1/analyze`. Free at [console.groq.com](https://console.groq.com). Without it, both endpoints stay up but return empty results. |
 | `SUGGESTIONS_MODEL` | `openai/gpt-oss-120b` | Groq model used by both AI endpoints. |
+| `CEREBRAS_API_KEY` | *(unset)* | Optional fallback: retries once via Cerebras when Groq returns a `429`. Free at [cloud.cerebras.ai](https://cloud.cerebras.ai). |
+| `CEREBRAS_MODEL` | `gpt-oss-120b` | Cerebras model used for the fallback retry. |
 | `ANALYZE_PER_MINUTE` | `10` | Per-IP `/v1/analyze` requests per minute before `429`. |
 | `WORDS_PER_MINUTE` | `30` | Per-IP `/v1/words` requests per minute before `429`. |
+| `SUGGESTIONS_CACHE_TTL_MS` | `900000` (15 min) | How long a `/v1/suggestions` result is cached in memory per language. |
+| `ANALYZE_CACHE_MAX_ENTRIES` | `500` | Max `(language, sentence)` pairs `/v1/analyze` keeps cached at once (no TTL — oldest evicted first). |
 
 `.env` is loaded automatically by `npm run dev`/`npm start`/the scripts below (via Node's
 `--env-file-if-exists` flag) — no `dotenv` dependency needed, and a missing `.env` is fine.
@@ -86,7 +91,7 @@ rate limiters above are the actual abuse control for non-browser callers.
 
 ```bash
 npm run dev              # tsx watch src/index.ts (hot reload, auto-loads .env if present)
-npm run lint              # eslint .
+npm run lint              # eslint using eslint.config.js file
 npm run build             # tsc -> dist/
 npm start                 # node dist/index.js (auto-loads .env if present)
 npm run seed-test-words        # POST a batch of test words to a running server
