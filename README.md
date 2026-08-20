@@ -3,7 +3,7 @@
 A tiny Express + TypeScript + Node's built-in [`node:sqlite`](https://nodejs.org/api/sqlite.html)
 service that collects individual words added by users in the Word Bank app and serves an
 aggregated list back to the marketing site's floating-words background animation and the words that the users have currently saved with the app. 
-It also hosts two Groq-backed AI endpoints: `/v1/suggestions` (typewriter placeholder words/books and example sentences)
+It also hosts two Groq-backed (Cerebras fallback) AI endpoints: `/v1/suggestions` (typewriter placeholder words/books and example sentences)
 and `/v1/analyze` (plain-language sentence explanation).
 
 It stores nothing but the bare word, a frequency count, and optional public dictionary
