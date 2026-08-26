@@ -77,6 +77,7 @@ async function callModelprovider(
             body: JSON.stringify({
                 model: modelName,
                 max_tokens: maxTokens,
+                reasoning_effort: "low",
                 messages: [{ role: "user", content: prompt }],
                 ...(json ? { response_format: { type: "json_object" } } : {}),
             }),
