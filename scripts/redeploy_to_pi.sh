@@ -64,8 +64,28 @@ ssh "$PI_HOST" "docker run -d --name $CONTAINER_NAME --restart unless-stopped \
   -e ANALYZE_PER_MINUTE=$ANALYZE_PER_MINUTE -e WORDS_PER_MINUTE=$WORDS_PER_MINUTE \
   word-bank-server"
 
-echo "==> Verifying (health check)..."
-ssh "$PI_HOST" 'curl -s "http://localhost:4000/v1"'
+echo "==> Waiting for the server to come up..."
+# `docker run -d` returns as soon as the container starts, not once Node is
+# actually listening — retry the health check for a few seconds instead of
+# checking once immediately, which can race a slow cold start (especially on
+# a Pi) and report a false failure even though the container is fine.
+HEALTHY=false
+for _ in 1 2 3 4 5 6 7 8 9 10; do
+  if ssh "$PI_HOST" 'curl -sf "http://localhost:4000/v1"' > /tmp/redeploy_health_check.json 2>/dev/null; then
+    HEALTHY=true
+    break
+  fi
+  sleep 1
+done
+
+if [[ "$HEALTHY" != true ]]; then
+  echo "Server did not respond on /v1 after 10 seconds — check the container:" >&2
+  echo "  ssh $PI_HOST 'docker ps -a | grep $CONTAINER_NAME; docker logs $CONTAINER_NAME --tail 50'" >&2
+  exit 1
+fi
+
+echo "==> Healthy:"
+cat /tmp/redeploy_health_check.json
 echo
 echo "==> Done. To also confirm AI suggestions are working:"
 echo "    curl \"http://localhost:4000/v1/suggestions?lang=nl\""
