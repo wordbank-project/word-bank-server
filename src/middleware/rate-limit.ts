@@ -56,3 +56,4 @@ function createRateLimiter(rateLimitAmount: number): RequestHandler {
 
 export const analyzeRateLimiter = createRateLimiter(resolveLimit(process.env.ANALYZE_PER_MINUTE, 10));
 export const wordsRateLimiter = createRateLimiter(resolveLimit(process.env.WORDS_PER_MINUTE, 30));
+export const bookNotesRateLimiter = createRateLimiter(resolveLimit(process.env.BOOK_NOTES_PER_MINUTE, 10));

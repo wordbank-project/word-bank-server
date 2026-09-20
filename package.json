@@ -16,6 +16,7 @@
     "delete-test-words": "tsx --env-file-if-exists=.env scripts/delete-test-words.ts",
     "delete-word": "tsx --env-file-if-exists=.env scripts/delete-word.ts",
     "test-rate-limit": "tsx scripts/test-rate-limit.ts",
+    "test-book-notes": "tsx --env-file-if-exists=.env scripts/test-book-notes.ts",
     "lint": "eslint ."
   },
   "dependencies": {

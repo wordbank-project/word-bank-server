@@ -10,7 +10,7 @@ import { completeChat, hasLlmKeyConfigured } from "./llm.js";
 // the same handful of sentences.
 //
 // No TTL, unlike suggestions.ts — an explanation never goes stale, so it's reused.
-// Without GROQ_API_KEY the feature is off and callers get null.
+// Without GEMINI_API_KEY the feature is off and callers get null.
 const MAX_CACHE_ENTRIES = Number(process.env.ANALYZE_CACHE_MAX_ENTRIES) || 500;
 
 const cache = new LRUCache<string, string>({ max: MAX_CACHE_ENTRIES });

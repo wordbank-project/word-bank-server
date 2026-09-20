@@ -1,93 +1,97 @@
 // The LLM call, shared by every AI feature. One prompt in, the model's text
-// reply out. Groq's free tier is primary; if Groq returns a 429 on /v1/suggestions or /v1/analyze,
-// and CEREBRAS_API_KEY is configured, one retry goes to Cerebras's free tier.
-// Both are OpenAI-compatible chat-completions endpoints.
+// reply out. Calls Google's Gemini API (generateContent) directly — no
+// second provider/fallback; this is a full replacement of the old
+// Groq+Cerebras setup, not an additional option alongside it. A 429 from
+// Gemini surfaces as-is (see completeChat below).
 
 import chalk from "chalk";
-import { CompleteOptions } from "./complete-options.js";
+import { CompleteOptions, GeminiSchema } from "./complete-options.js";
 
 import { HttpError } from "../utils/http-error.js";
 
-const GROQ_API_KEY = process.env.GROQ_API_KEY?.trim() || undefined;
-const MODEL = process.env.SUGGESTIONS_MODEL || "openai/gpt-oss-120b";
-
-// Optional key. Used as fallback model for now.
-const CEREBRAS_API_KEY = process.env.CEREBRAS_API_KEY?.trim() || undefined;
-const CEREBRAS_MODEL = process.env.CEREBRAS_MODEL || "gpt-oss-120b";
+const GEMINI_API_KEY = process.env.GEMINI_API_KEY?.trim() || undefined;
+// gemini-2.5-flash was the original default here, but confirmed live (Aug 2026) as
+// "no longer available to new users" — Google's own 404 error names gemini-3.6-flash as
+// the replacement, which is what's used below.
+const GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-3.6-flash";
 
 const DEFAULT_TIMEOUT_MS = 60_000;
 const DEFAULT_MAX_TOKENS = 4000;
 
-const QROQ_BRAND_RED = "#F55036";
-const CEREBRAS_BRAND_ORANGE = "#FF6B00";
+const GEMINI_BRAND_BLUE = "#4285F4";
 
-if (GROQ_API_KEY) {
-    console.log(chalk.hex(QROQ_BRAND_RED)(`API key is configured for LLM: groq (${MODEL})`));
-}
-// Fallback Cerebras API key is also configured
-if (GROQ_API_KEY && CEREBRAS_API_KEY) {
-    console.log(chalk.hex(CEREBRAS_BRAND_ORANGE)(`Cerebras fallback API key is configured for 429 rate limits: cerebras (${CEREBRAS_MODEL})`));
+if (GEMINI_API_KEY) {
+    console.log(chalk.hex(GEMINI_BRAND_BLUE)(`API key is configured for LLM: gemini (${GEMINI_MODEL})`));
 }
 
 /**
  * True when an API key is configured, i.e. the AI features are enabled.
  *
- * @returns {boolean} `true` if `GROQ_API_KEY` is set.
+ * @returns {boolean} `true` if `GEMINI_API_KEY` is set.
  *
  */
 export function hasLlmKeyConfigured(): boolean {
-    return Boolean(GROQ_API_KEY);
+    return Boolean(GEMINI_API_KEY);
 }
 
+/** The shape of a Gemini `generateContent` response, as far as this file reads it. */
+type GeminiResponse = {
+    candidates?: { content?: { parts?: { text?: unknown }[] } }[];
+};
+
 /**
- * Calls one OpenAI-compatible chat-completions endpoint with `prompt` 
- * as the only user message and returns the model's raw text reply. 
- * May throw (HTTP error, timeout, bad JSON) — callers treat any failure as "no data".
+ * Calls Gemini's `generateContent` endpoint with `prompt` as the only user message and
+ * returns the model's raw text reply. May throw (HTTP error, timeout, bad JSON) — callers
+ * treat any failure as "no data".
  *
- * @param {string} baseUrl The provider's chat-completions endpoint URL.
- * @param {string} apiKey The bearer token for that provider.
- * @param {string} modelName The model name to request.
- * @param {string} providerLabel Human-readable provider name, used only in the thrown error message.
+ * Explicitly sets thinking to its lowest level (`thinkingLevel: "minimal"`): Gemini 3 models
+ * think by default, and thinking tokens draw from the same `maxOutputTokens` budget as the
+ * visible reply — left uncontrolled, it can silently exhaust the budget before any content
+ * is produced, the same failure mode Groq's `reasoning_effort: "low"` used to guard against
+ * here. Confirmed live: `thinkingBudget` (the Gemini 2.5-era control) is rejected outright
+ * with a 400 on Gemini 3 models — `thinkingLevel` (`"minimal"`/`"low"`/`"medium"`/`"high"`)
+ * is the Gemini 3 replacement, not just a rename.
+ *
  * @param {string} prompt The full prompt to send as the user message.
- * @param {boolean} json Whether to ask for JSON-object mode.
+ * @param {GeminiSchema} [schema] JSON Schema to constrain the reply to, if any.
  * @param {number} maxTokens Maximum tokens the model may generate in its reply.
  * @param {number} timeoutMs How long to wait before aborting the request.
  * @returns {Promise<string>} The model's text reply, or `""` if the response had no content.
  *
  */
-async function callModelprovider(
-    baseUrl: string,
-    apiKey: string,
-    modelName: string,
-    providerNameLabel: string,
+async function callGemini(
     prompt: string,
-    json: boolean,
+    schema: GeminiSchema | undefined,
     maxTokens: number,
     timeoutMs: number,
 ): Promise<string> {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), timeoutMs);
     try {
-        const res = await fetch(baseUrl, {
-            method: "POST",
-            headers: {
-                "content-type": "application/json",
-                authorization: `Bearer ${apiKey}`,
+        const res = await fetch(
+            `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`,
+            {
+                method: "POST",
+                headers: {
+                    "content-type": "application/json",
+                    "x-goog-api-key": GEMINI_API_KEY ?? "",
+                },
+                body: JSON.stringify({
+                    contents: [{ role: "user", parts: [{ text: prompt }] }],
+                    generationConfig: {
+                        maxOutputTokens: maxTokens,
+                        thinkingConfig: { thinkingLevel: "minimal" },
+                        ...(schema ? { responseMimeType: "application/json", responseSchema: schema } : {}),
+                    },
+                }),
+                signal: controller.signal,
             },
-            body: JSON.stringify({
-                model: modelName,
-                max_tokens: maxTokens,
-                reasoning_effort: "low",
-                messages: [{ role: "user", content: prompt }],
-                ...(json ? { response_format: { type: "json_object" } } : {}),
-            }),
-            signal: controller.signal,
-        });
+        );
         if (!res.ok) {
-            throw new HttpError(res.status, `${providerNameLabel} returned HTTP ${res.status}`);
+            throw new HttpError(res.status, `Gemini returned HTTP ${res.status}`);
         }
-        const data = (await res.json()) as { choices?: { message?: { content?: unknown } }[] };
-        const text = data?.choices?.[0]?.message?.content;
+        const data = (await res.json()) as GeminiResponse;
+        const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
         return typeof text === "string" ? text : "";
     } finally {
         clearTimeout(timeout);
@@ -95,46 +99,16 @@ async function callModelprovider(
 }
 
 /**
- * Calls the Groq AI service first; 
- * if Groq specifically returns a 429 and CEREBRAS_API_KEY is configured, 
- * retries once via the Cerebras AI service instead. 
- * Any other errors get thrown as-is.
+ * Calls Gemini with `prompt` as the only user message and returns its raw text reply.
+ * No fallback provider — a `429` (or any other failure) is thrown as-is for the caller to
+ * handle (see `sendErrorResponse` in `utils/http-error.ts`).
  *
  * @param {string} prompt The full prompt to send as the user message.
- * @param {CompleteOptions} [options] Overrides for JSON mode, max tokens, and the abort timeout.
+ * @param {CompleteOptions} [options] Overrides for the response schema, max tokens, and the abort timeout.
  * @returns {Promise<string>} The model's text reply, or `""` if the response had no content.
  *
  */
 export async function completeChat(prompt: string, options: CompleteOptions = {}): Promise<string> {
-    // Defaults json to false: analyze.ts wants human senteces (its prompt never says "json", 
-    // which JSON mode requires), and suggestions.ts wants a top-level JSON array, not the json object
-    const { json = false, maxTokens = DEFAULT_MAX_TOKENS, timeoutMs = DEFAULT_TIMEOUT_MS } = options;
-
-    try {
-        return await callModelprovider(
-            "https://api.groq.com/openai/v1/chat/completions",
-            GROQ_API_KEY ?? "",
-            MODEL,
-            "Groq",
-            prompt,
-            json,
-            maxTokens,
-            timeoutMs,
-        );
-    } catch (err: unknown) {
-        if (CEREBRAS_API_KEY && err instanceof HttpError && err.status === 429) {
-            return callModelprovider(
-                "https://api.cerebras.ai/v1/chat/completions",
-                CEREBRAS_API_KEY,
-                CEREBRAS_MODEL,
-                "Cerebras",
-                prompt,
-                json,
-                maxTokens,
-                timeoutMs,
-            );
-        }
-        // Any other errors
-        throw err;
-    }
+    const { schema, maxTokens = DEFAULT_MAX_TOKENS, timeoutMs = DEFAULT_TIMEOUT_MS } = options;
+    return callGemini(prompt, schema, maxTokens, timeoutMs);
 }

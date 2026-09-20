@@ -3,12 +3,13 @@ import cors from "cors";
 
 import { upsertWord, getWords, sanitizeWord, sanitizeText } from "./word/words.js";
 import { getSuggestionPair, isSuggestionPairCached } from "./suggestion/suggestions.js";
-import { analyzeSentence, isAnalysisCached } from "./ai/analyze.js";
+import { analyzeSentence, isAnalysisCached } from "./ai/sentences.js";
+import { analyzeBookNotes, isBookNotesCached } from "./ai/book-notes.js";
 
 import { sendErrorResponse } from "./utils/http-error.js";
 
 import { createRequestLogger, logListening } from "./middleware/request-logger.js";
-import { analyzeRateLimiter, wordsRateLimiter } from "./middleware/rate-limit.js";
+import { analyzeRateLimiter, wordsRateLimiter, bookNotesRateLimiter } from "./middleware/rate-limit.js";
 import { parseAllowedOrigins } from "./middleware/cors.js";
 
 const app = express();
@@ -18,8 +19,9 @@ const app = express();
 // trusting an unlimited chain would let a client fake its own IP.
 app.set("trust proxy", 1);
 
-// We limit it to 10kb because currently the only POST endpoints are /v1/words and /v1/analyze,
-// This is to prevent large body requests being sent to the server
+// We limit it to 10kb because the POST endpoints are /v1/words, /v1/analyze/sentences, and
+// /v1/analyze/book-notes, none of which need anywhere near that much (book notes alone are
+// capped at 2000 chars). This is to prevent large body requests being sent to the server
 app.use(express.json({ limit: "10kb" }));
 app.use(cors({ origin: parseAllowedOrigins(process.env.ALLOWED_ORIGIN) }));
 
@@ -106,9 +108,9 @@ app.get("/v1/words", (req: Request, res: Response) => {
 
 /**
  * Returns AI-generated word/book/sentence suggestions for the app's typewriter
- * placeholders (see suggestions.ts). Without `GROQ_API_KEY` returns empty
+ * placeholders (see suggestions.ts). Without `GEMINI_API_KEY` returns empty
  * arrays so the app falls back to its built-in lists. Any other failure (a
- * Groq-side rate limit, an unexpected error) is caught below and sent via
+ * Gemini-side rate limit, an unexpected error) is caught below and sent via
  * sendErrorResponse.
  * Default is English (`lang=en`), but any ISO 639 language code is accepted (e.g. `lang=nl`).
  * Sends an `X-Cache: HIT`/`MISS` response header so a browser can tell, without timing the
@@ -136,21 +138,21 @@ app.get("/v1/suggestions", async (req: Request, res: Response) => {
 });
 
 /**
- * Explains what a submitted sentence means, in plain language (see analyze.ts).
- * Without `GROQ_API_KEY` returns `{ meaning: null }`. Any other failure (a Groq-side rate
+ * Explains what a submitted sentence means, in plain language (see sentences.ts).
+ * Without `GEMINI_API_KEY` returns `{ meaning: null }`. Any other failure (a Gemini-side rate
  * limit, an unexpected error) is caught below and sent via sendErrorResponse.
  * Rate limited (see middleware/rate-limit.ts) — the limiter runs before this handler,
  * so an over-limit request never even reaches the validation below.
  * Sends an `X-Cache: HIT`/`MISS` response header so a browser can tell, without timing the
- * request, whether this exact (language, sentence) pair was already cached (see analyze.ts).
+ * request, whether this exact (language, sentence) pair was already cached (see sentences.ts).
  *
  * @param {Request} req The incoming request; `lang` query param selects the language, body is `{ text }`.
  * @param {Response} res The response used to send the result.
  * @returns {Promise<void>} Returns nothing; sends the JSON explanation, a `400`, a `429`, or a `500`.
- * @example POST http://localhost:4000/v1/analyze?lang=nl
+ * @example POST http://localhost:4000/v1/analyze/sentences?lang=nl
  *
  */
-app.post("/v1/analyze", analyzeRateLimiter, async (req: Request, res: Response) => {
+app.post("/v1/analyze/sentences", analyzeRateLimiter, async (req: Request, res: Response) => {
   const chosenLanguage = typeof req.query.lang === "string" ? req.query.lang.toLowerCase() : "en";
   if (!/^[a-z]{2,3}$/.test(chosenLanguage)) {
     res.status(400).json({ success: false, error: "Invalid lang parameter given" });
@@ -166,6 +168,42 @@ app.post("/v1/analyze", analyzeRateLimiter, async (req: Request, res: Response) 
   try {
     res.setHeader("X-Cache", isAnalysisCached(enteredSentence, chosenLanguage) ? "HIT" : "MISS");
     res.json({ meaning: await analyzeSentence(enteredSentence, chosenLanguage) });
+  } catch (err: unknown) {
+    sendErrorResponse(err, res);
+  }
+});
+
+/**
+ * Explains the meaning behind a reader's own notes about a book — themes/significance, not
+ * a restatement of the notes (see book-notes.ts). Without `GEMINI_API_KEY` returns
+ * `{ meaning: null }`. Any other failure (a Gemini-side rate limit, an unexpected error) is
+ * caught below and sent via sendErrorResponse.
+ * Rate limited (see middleware/rate-limit.ts) — the limiter runs before this handler,
+ * so an over-limit request never even reaches the validation below.
+ * Sends an `X-Cache: HIT`/`MISS` response header, same reasoning as `/v1/analyze/sentences`.
+ *
+ * @param {Request} req The incoming request; `lang` query param selects the language, body is `{ notes }`.
+ * @param {Response} res The response used to send the result.
+ * @returns {Promise<void>} Returns nothing; sends the JSON explanation, a `400`, a `429`, or a `500`.
+ * @example POST http://localhost:4000/v1/analyze/book-notes?lang=nl
+ *
+ */
+app.post("/v1/analyze/book-notes", bookNotesRateLimiter, async (req: Request, res: Response) => {
+  const chosenLanguage = typeof req.query.lang === "string" ? req.query.lang.toLowerCase() : "en";
+  if (!/^[a-z]{2,3}$/.test(chosenLanguage)) {
+    res.status(400).json({ success: false, error: "Invalid lang parameter given" });
+    return;
+  }
+
+  const enteredNotes = sanitizeText(req.body?.notes, 2000);
+  if (enteredNotes === null) {
+    res.status(400).json({ success: false, error: "Invalid notes entered" });
+    return;
+  }
+
+  try {
+    res.setHeader("X-Cache", isBookNotesCached(enteredNotes, chosenLanguage) ? "HIT" : "MISS");
+    res.json({ meaning: await analyzeBookNotes(enteredNotes, chosenLanguage) });
   } catch (err: unknown) {
     sendErrorResponse(err, res);
   }

@@ -12,8 +12,8 @@
 # Usage: ./scripts/redeploy_to_pi.sh [pi-host]
 # Example: ./scripts/redeploy_to_pi.sh pi@raspberrypi.local
 #
-# GROQ_API_KEY / CEREBRAS_API_KEY are read from this repo's own .env (never
-# hardcoded here, so this script is safe to commit). ALLOWED_ORIGIN and the
+# GEMINI_API_KEY is read from this repo's own .env (never hardcoded here, so
+# this script is safe to commit). ALLOWED_ORIGIN and the
 # rate limits below match the LAN-testing setup currently in deployment.md —
 # override any of them via env vars if your setup differs, e.g.:
 #   ALLOWED_ORIGIN=https://word-bank-vault.netlify.app ./scripts/redeploy_to_pi.sh
@@ -35,14 +35,15 @@ if [[ -f .env ]]; then
   set +a
 fi
 
-if [[ -z "${GROQ_API_KEY:-}" ]]; then
-  echo "GROQ_API_KEY not set — add it to .env first (see .env.example)." >&2
+if [[ -z "${GEMINI_API_KEY:-}" ]]; then
+  echo "GEMINI_API_KEY not set — add it to .env first (see .env.example)." >&2
   exit 1
 fi
 
 ALLOWED_ORIGIN="${ALLOWED_ORIGIN:-https://word-bank-vault.netlify.app,http://localhost:8081}"
 ANALYZE_PER_MINUTE="${ANALYZE_PER_MINUTE:-10}"
 WORDS_PER_MINUTE="${WORDS_PER_MINUTE:-30}"
+BOOK_NOTES_PER_MINUTE="${BOOK_NOTES_PER_MINUTE:-10}"
 
 echo "==> Pulling latest code on $PI_HOST..."
 ssh "$PI_HOST" "cd $REMOTE_DIR && git pull"
@@ -59,9 +60,9 @@ ssh "$PI_HOST" "docker run -d --name $CONTAINER_NAME --restart unless-stopped \
   -p 4000:4000 -v words-data:/app/data \
   -e PORT=4000 \
   -e ALLOWED_ORIGIN=$ALLOWED_ORIGIN \
-  -e GROQ_API_KEY=$GROQ_API_KEY \
-  -e CEREBRAS_API_KEY=${CEREBRAS_API_KEY:-} \
+  -e GEMINI_API_KEY=$GEMINI_API_KEY \
   -e ANALYZE_PER_MINUTE=$ANALYZE_PER_MINUTE -e WORDS_PER_MINUTE=$WORDS_PER_MINUTE \
+  -e BOOK_NOTES_PER_MINUTE=$BOOK_NOTES_PER_MINUTE \
   word-bank-server"
 
 echo "==> Waiting for the server to come up..."

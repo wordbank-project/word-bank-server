@@ -1,6 +1,6 @@
 /// <reference types="node" />
 
-// Integration test for src/middleware/rate-limit.ts's two limiters.
+// Integration test for src/middleware/rate-limit.ts's three limiters.
 // Exercises them over real HTTP, confirming that each limiter allows the
 // expected number of requests per minute, blocks over-limit requests, and
 // keeps each IP's budget separate from other IPs.
@@ -9,10 +9,11 @@
 //   npm run test-rate-limit
 
 import express from "express";
-import { analyzeRateLimiter, wordsRateLimiter } from "../src/middleware/rate-limit.js";
+import { analyzeRateLimiter, wordsRateLimiter, bookNotesRateLimiter } from "../src/middleware/rate-limit.js";
 
 const ANALYZE_LIMIT = 10;
 const WORDS_LIMIT = 30;
+const BOOK_NOTES_LIMIT = 10;
 
 let failures = 0;
 
@@ -73,11 +74,14 @@ async function hitServer(base: string, path: string, ip: string): Promise<number
  * @param {string} name Label for this limiter, used in log output.
  * @param {string} path The route this limiter guards.
  * @param {number} limit The number of requests it should allow per minute.
+ * @param {number} ipId A small integer, distinct per limiter under test, used to derive this
+ * limiter's fake IPs — kept separate from `limit` so two limiters that happen to share the
+ * same numeric limit (e.g. both `10`) still never collide on the same fake IP.
  * @returns {Promise<void>} Returns nothing; logs each check.
  *
  */
-async function checkRateLimiter(base: string, name: string, path: string, limit: number): Promise<void> {
-  const ip = `203.0.113.${limit}`; // distinct fake IP per limiter, so tests don't collide
+async function checkRateLimiter(base: string, name: string, path: string, limit: number, ipId: number): Promise<void> {
+  const ip = `203.0.113.${ipId}`; // distinct fake IP per limiter, so tests don't collide
   for (let i = 1; i <= limit; i++) {
     assertEqual(`${name}: request ${i}/${limit} from a fresh IP is allowed`, await hitServer(base, path, ip), 200);
   }
@@ -85,7 +89,7 @@ async function checkRateLimiter(base: string, name: string, path: string, limit:
   assertEqual(`${name}: request ${limit + 1} is blocked`, await hitServer(base, path, ip), 429);
   assertEqual(`${name}: request ${limit + 2} is blocked`, await hitServer(base, path, ip), 429);
 
-  const otherIp = `198.51.100.${limit}`;
+  const otherIp = `198.51.100.${ipId}`;
   assertEqual(`${name}: a different IP has its own independent bucket`, await hitServer(base, path, otherIp), 200);
 }
 
@@ -148,6 +152,7 @@ async function main(): Promise<void> {
   app.set("trust proxy", true); // so X-Forwarded-For above simulates distinct IPs, like production
   app.get("/analyze", analyzeRateLimiter, (_req, res) => res.status(200).json({ ok: true }));
   app.get("/words", wordsRateLimiter, (_req, res) => res.status(200).json({ ok: true }));
+  app.get("/book-notes", bookNotesRateLimiter, (_req, res) => res.status(200).json({ ok: true }));
 
   const server = app.listen(0);
   await new Promise<void>((resolve) => server.once("listening", resolve));
@@ -155,12 +160,20 @@ async function main(): Promise<void> {
   const port = typeof address === "object" && address !== null ? address.port : 0;
   const base = `http://localhost:${port}`;
 
-  await checkRateLimiter(base, "analyzeRateLimiter", "/analyze", ANALYZE_LIMIT);
-  await checkRateLimiter(base, "wordsRateLimiter", "/words", WORDS_LIMIT);
+  await checkRateLimiter(base, "analyzeRateLimiter", "/analyze", ANALYZE_LIMIT, 1);
+  await checkRateLimiter(base, "wordsRateLimiter", "/words", WORDS_LIMIT, 2);
+  await checkRateLimiter(base, "bookNotesRateLimiter", "/book-notes", BOOK_NOTES_LIMIT, 3);
 
   assertEqual(
     "analyzeRateLimiter and wordsRateLimiter don't share a budget",
-    await hitServer(base, "/words", `203.0.113.${ANALYZE_LIMIT}`), // an IP already blocked on the analyze limiter above
+    await hitServer(base, "/words", "203.0.113.1"), // an IP already blocked on the analyze limiter above
+    200,
+  );
+  assertEqual(
+    "analyzeRateLimiter and bookNotesRateLimiter don't share a budget",
+    // Same IP already blocked on /analyze above (ANALYZE_LIMIT === BOOK_NOTES_LIMIT, both
+    // 10) but never used against /book-notes — confirms it has its own independent bucket.
+    await hitServer(base, "/book-notes", "203.0.113.1"),
     200,
   );
 
