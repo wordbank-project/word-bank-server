@@ -12,7 +12,8 @@ metadata (definition, part of speech, phonetic) — no user id, no book id, no p
 ## Features
 
 - **Word collection** — `POST /v1/words` saves a word (incrementing its count if already
-  seen); `GET /v1/words` serves the aggregated list back, sorted by recency or popularity.
+  seen); `GET /v1/words` serves the aggregated list back, sorted by recency or popularity
+  (add `includeTotal=true` to also get the total number of all words saved).
 - **AI suggestions** — `GET /v1/suggestions` generates vocabulary words, books (title/author/year)
   and example sentences for the app's typewriter placeholders and the analyze page, via Groq's free-tier LLM (Cerebras as fallback).
 - **AI sentence analysis** — `POST /v1/analyze` explains a submitted sentence in plain
@@ -75,7 +76,7 @@ or visit it for a health check.
 |--------|------|---------------|-----------|
 | GET | `/v1` | — | `{ success: true, title: "Word Bank Server REST API" }` health check |
 | POST | `/v1/words` | `{ word, definition?, partOfSpeech?, phonetic? }` | `200 { success: true }` / `400 { success: false, error }` / `429 { success: false, error }` / `500 { success: false }` |
-| GET | `/v1/words` | `limit` (default 100, clamped 1..500), `order` (`top` \| `recent`, default `recent`) | `200 [{ word, count, definition, partOfSpeech, phonetic }]` |
+| GET | `/v1/words` | `limit` (default 100, clamped 1..500), `order` (`top` \| `recent`, default `recent`), `includeTotal` (`true` to add the total) | `200 [{ word, count, definition, partOfSpeech, phonetic }]`, or with `includeTotal=true`: `200 { totalCount, words: [...] }` (`totalCount` = distinct words saved, independent of `limit`) |
 | GET | `/v1/suggestions` | `lang` (default `en`, must match `^[a-z]{2,3}$`) | `200 { words: string[], books: { title: string, author: string, year: string }[], sentences: string[] }` (empty arrays when `GROQ_API_KEY` is unset or on any failure) |
 | POST | `/v1/analyze` | `lang` query param (default `en`, same regex), body `{ text }` (`<= 300` chars) | `200 { meaning: string \| null }` / `400 { success: false, error }` / `429 { success: false, error }` |
 

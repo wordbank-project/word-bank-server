@@ -1,7 +1,7 @@
 import express, { type Request, type Response } from "express";
 import cors from "cors";
 
-import { upsertWord, getWords, sanitizeWord, sanitizeText } from "./word/words.js";
+import { upsertWord, getWords, countWords, sanitizeWord, sanitizeText } from "./word/words.js";
 import { getSuggestionPair, isSuggestionPairCached } from "./suggestion/suggestions.js";
 import { analyzeSentence, isAnalysisCached } from "./ai/analyze.js";
 
@@ -85,12 +85,14 @@ app.post("/v1/words", wordsRateLimiter, (req: Request, res: Response) => {
 
 /**
  * Returns the recent or most-saved words, for the marketing site's
- * floating-words animation.
+ * floating-words animation and word wall. With `includeTotal=true` the list is
+ * wrapped as `{ totalCount, words }`; without it the body stays a bare array,
+ * which already-installed app versions depend on (they check `Array.isArray`).
  *
- * @param {Request} req The incoming request; `limit` and `order` query params control paging/sort.
+ * @param {Request} req The incoming request; `limit` and `order` control paging/sort, `includeTotal=true` adds the total word count.
  * @param {Response} res The response used to send the word list as JSON.
- * @returns {void} Returns nothing; sends the JSON array.
- * @example GET http://localhost:4000/v1/words
+ * @returns {void} Returns nothing; sends the JSON array, or `{ totalCount, words }` when requested.
+ * @example GET http://localhost:4000/v1/words?order=top&limit=120&includeTotal=true
  * 
  */
 app.get("/v1/words", (req: Request, res: Response) => {
@@ -101,7 +103,13 @@ app.get("/v1/words", (req: Request, res: Response) => {
 
   amountOfWords = Math.max(1, Math.min(500, Math.floor(amountOfWords)));
   const sortOrder = req.query.order === "top" ? "top" : "recent";
-  res.status(200).json(getWords(amountOfWords, sortOrder));
+  const words = getWords(amountOfWords, sortOrder);
+  if (req.query.includeTotal !== "true") {
+    res.status(200).json(words);
+    return;
+  }
+
+  res.status(200).json({ totalCount: countWords(), words });
 });
 
 /**

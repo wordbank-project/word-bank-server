@@ -15,7 +15,7 @@ no private notes.
 
 | File | What it's for |
 |------|----------------|
-| [`src/word/words.ts`](src/word/words.ts) | SQLite schema/migration, `sanitizeWord`/`sanitizeText` validators, `upsertWord`/`getWords`. `deleteWords` also lives here but is never exposed over HTTP — see "Deleting a word" below. |
+| [`src/word/words.ts`](src/word/words.ts) | SQLite schema/migration, `sanitizeWord`/`sanitizeText` validators, `upsertWord`/`getWords`/`countWords`. `deleteWords` also lives here but is never exposed over HTTP — see "Deleting a word" below. |
 | [`src/ai/llm.ts`](src/ai/llm.ts) | The one function (`completeChat`) that calls Groq's OpenAI-compatible chat-completions endpoint. `hasLlmKeyConfigured()` gates every AI code path. |
 | [`src/ai/complete-options.ts`](src/ai/complete-options.ts) | `CompleteOptions` — the `json`/`maxTokens`/`timeoutMs` overrides `completeChat` accepts. |
 | [`src/suggestion/suggestions.ts`](src/suggestion/suggestions.ts) | Builds the `/v1/suggestions` response: one prompt per list (`wordsPrompt`/`booksPrompt`/`sentencesPrompt`, fired together via `Promise.all` in `getSuggestionPair`), tolerant JSON-array extraction (`extractJsonArray`), `parseSuggestionList` validation for words/sentences (per `SuggestionKind`), and `parseBookList` for the structured `{ title, author, year }` book list. |
@@ -34,7 +34,7 @@ no private notes.
 |--------|------|---------------|-----------|
 | GET | `/v1` | — | `{ success: true, title: "Word Bank Server REST API" }` health check |
 | POST | `/v1/words` | `{ word, definition?, partOfSpeech?, phonetic? }` | `200 { success: true }` / `400 { success: false, error }` / `429 { success: false, error }` / `500 { success: false }` |
-| GET | `/v1/words` | `limit` (default 100, clamped 1..500), `order` (`top` \| `recent`, default `recent`) | `200 [{ word, count, definition, partOfSpeech, phonetic }]` |
+| GET | `/v1/words` | `limit` (default 100, clamped 1..500), `order` (`top` \| `recent`, default `recent`), `includeTotal` (`true` to add the total) | `200 [{ word, count, definition, partOfSpeech, phonetic }]`, or with `includeTotal=true`: `200 { totalCount, words: [...] }` (`totalCount` = distinct words saved, independent of `limit`) |
 | GET | `/v1/suggestions` | `lang` (default `en`, must match `^[a-z]{2,3}$`) | `200 { words: string[], books: { title: string, author: string, year: string }[], sentences: string[] }` (empty arrays when `GROQ_API_KEY` is unset or on any failure) |
 | POST | `/v1/analyze` | `lang` query param (default `en`, same regex), body `{ text }` (`<= 300` chars via `sanitizeText`) | `200 { meaning: string \| null }` / `400 { success: false, error }` / `429 { success: false, error }` |
 

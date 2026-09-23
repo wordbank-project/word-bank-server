@@ -67,6 +67,9 @@ const getTopWordStatement = db.prepare(
    FROM words ORDER BY count DESC, updated_at DESC LIMIT ?`
 );
 
+// Number of all words ever saved (one row per word), for GET /v1/words?includeTotal=true.
+const countWordsStatement = db.prepare(`SELECT COUNT(*) AS totalCount FROM words`);
+
 /**
  * Validates and normalizes a submitted word: trims, lowercases, 
  * and rejects empty, too-long, link-like content.
@@ -151,6 +154,17 @@ export function upsertWord(word: string, meta: WordMeta = {}): void {
 export function getWords(limit: number, order: "recent" | "top"): FeedWord[] {
   const wordsStatement = order === "top" ? getTopWordStatement : getRecentWordStatement;
   return wordsStatement.all(limit) as FeedWord[];
+}
+
+/**
+ * Counts all the words saved in the database, independent of any `limit`.
+ *
+ * @returns {number} The total number of words in the `words` table.
+ *
+ */
+export function countWords(): number {
+  const row = countWordsStatement.get() as { totalCount: number };
+  return Number(row.totalCount);
 }
 
 /**
