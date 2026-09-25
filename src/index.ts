@@ -44,8 +44,9 @@ app.use(createRequestLogger(serverOrigin));
  * @example GET http://localhost:4000/v1
  * 
  */
-app.get("/v1", (_req: Request, res: Response) => {
-  res.status(200).json({ success: true, title: "Word Bank Server REST API" });
+app.get("/v1", (req: Request, res: Response) => {
+  const baseUrl = `${req.protocol}://${req.get("host")}/v1`;
+  res.status(200).json({ success: true, title: "Word Bank Server REST API", words: `${baseUrl}/words`, });
 });
 
 /**
